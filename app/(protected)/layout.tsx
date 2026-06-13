@@ -4,7 +4,7 @@ import { Header } from "@/components/protected/header";
 import { Main } from "@/components/protected/main";
 import { ProfileDropdown } from "@/components/protected/profile-dropdown";
 import { TopNav } from "@/components/protected/top-nav";
-import { CommandIcon, HomeIcon, KeyIcon } from "lucide-react";
+import { CommandIcon, HomeIcon } from "lucide-react";
 import { redirect } from "next/navigation";
 
 export default async function ProtectedLayout({
@@ -38,13 +38,13 @@ const topNav = [
   {
     icon: <HomeIcon size={16} />,
     title: 'Home',
-    href: 'dashboard',
+    href: '/dashboard',
     isActive: true,
   },
   {
     icon: <CommandIcon size={16} />,
     title: 'Managable competitions',
-    href: 'dashboard/competitions',
+    href: '/dashboard/competitions',
     isActive: false,
   },
 ]

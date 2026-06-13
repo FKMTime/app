@@ -43,9 +43,12 @@ model User {
   email         String?   @unique
   emailVerified DateTime? @map("email_verified")
   image         String?
+  wcaUserId     Int?      @unique @map("wca_user_id")
+  wcaId         String?   @unique @map("wca_id")
+  isAdmin       Boolean   @default(false) @map("is_admin")
   accounts      Account[]
   sessions      Session[]
- 
+
   @@map("users")
 }
  

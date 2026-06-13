@@ -1,0 +1,14 @@
+{
+	email {$LETSENCRYPT_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Next.js serves /_next/static with long cache headers already.
+	reverse_proxy app:3000 {
+		flush_interval -1
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}
