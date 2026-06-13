@@ -331,7 +331,7 @@ async function upsertIncidents(
     };
     await tx.incident.upsert({
       where: { competitionId_instanceId: { competitionId, instanceId: r.instanceId } },
-      create: { competitionId, instanceId: r.instanceId, ...data },
+      create: { competitionId, instanceId: r.instanceId, source: "SYNC", ...data },
       update: data,
     });
     writes++;
@@ -452,9 +452,15 @@ async function applyCommon(
       // Delete rows not present in payload, children first.
       const keep = (rows: { instanceId: string }[]) =>
         rows.map((r) => r.instanceId);
+      // Only SYNC-sourced incidents are subject to snapshot reconciliation.
+      // Manually-created delegate incidents have source=MANUAL and survive.
       counts.incidents.deletes = (
         await tx.incident.deleteMany({
-          where: { competitionId, instanceId: { notIn: keep(payload.incidents) } },
+          where: {
+            competitionId,
+            source: "SYNC",
+            instanceId: { notIn: keep(payload.incidents) },
+          },
         })
       ).count;
       counts.attempts.deletes = (

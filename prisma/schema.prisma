@@ -53,6 +53,7 @@ model User {
   approvedCompetitions  Competition[]      @relation("ApprovedBy")
   competitionRoles      CompetitionRole[]
   editedAttempts        Attempt[]          @relation("AttemptEditedBy")
+  createdIncidents      Incident[]         @relation("IncidentCreatedBy")
 
   @@map("users")
 }
@@ -198,6 +199,11 @@ enum IncidentKind {
   WARNING
 }
 
+enum IncidentSource {
+  SYNC
+  MANUAL
+}
+
 model Person {
   id              String       @id @default(cuid())
   competitionId   String       @map("competition_id")
@@ -317,19 +323,22 @@ model Attempt {
 }
 
 model Incident {
-  id              String       @id @default(cuid())
-  competitionId   String       @map("competition_id")
-  competition     Competition  @relation(fields: [competitionId], references: [id], onDelete: Cascade)
-  instanceId      String       @map("instance_id")
+  id              String         @id @default(cuid())
+  competitionId   String         @map("competition_id")
+  competition     Competition    @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  instanceId      String         @map("instance_id")
+  source          IncidentSource @default(SYNC)
   kind            IncidentKind
   description     String
-  personId        String?      @map("person_id")
-  person          Person?      @relation(fields: [personId], references: [id], onDelete: SetNull)
-  attemptId       String?      @map("attempt_id")
-  attempt         Attempt?     @relation(fields: [attemptId], references: [id], onDelete: SetNull)
-  sourceUpdatedAt DateTime     @map("source_updated_at")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  personId        String?        @map("person_id")
+  person          Person?        @relation(fields: [personId], references: [id], onDelete: SetNull)
+  attemptId       String?        @map("attempt_id")
+  attempt         Attempt?       @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  createdById     String?        @map("created_by_id")
+  createdBy       User?          @relation("IncidentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  sourceUpdatedAt DateTime       @map("source_updated_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
 
   @@unique([competitionId, instanceId])
   @@index([competitionId])

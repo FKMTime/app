@@ -44,6 +44,24 @@ export function attemptText(a: AttemptDisplay): string {
   return a.penalty > 0 ? `${base}+` : base;
 }
 
+// Parses a human time string (e.g. "12.34", "1:23.45", "0.50") into
+// centiseconds. Returns null if the input is unparseable so the caller can
+// surface a friendly error.
+const TIME_RE = /^(?:(\d+):)?(\d+)(?:\.(\d{1,2}))?$/;
+export function parseHumanTime(input: string): number | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  const m = TIME_RE.exec(trimmed);
+  if (!m) return null;
+  const [, mm, ss, ff] = m;
+  const minutes = mm ? Number(mm) : 0;
+  const seconds = Number(ss);
+  const hundredths = ff ? Number(ff.padEnd(2, "0")) : 0;
+  if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return null;
+  if (seconds >= 60 && minutes > 0) return null;
+  return minutes * 60 * 100 + seconds * 100 + hundredths;
+}
+
 // "Best" of a completed-status set; skips DNF/DNS. Returns null if nothing
 // usable. Useful for highlighting the personal best across an attempts list.
 export function bestOf(attempts: AttemptDisplay[]): number | null {
