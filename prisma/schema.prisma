@@ -49,7 +49,102 @@ model User {
   accounts      Account[]
   sessions      Session[]
 
+  requestedCompetitions Competition[]      @relation("RequestedBy")
+  approvedCompetitions  Competition[]      @relation("ApprovedBy")
+  competitionRoles      CompetitionRole[]
+
   @@map("users")
+}
+
+enum CompetitionStatus {
+  REQUESTED
+  REJECTED
+  APPROVED
+  LIVE
+  FINISHED
+}
+
+enum CompetitionRoleKind {
+  ORGANIZER
+  DELEGATE
+}
+
+enum CompetitionRoleSource {
+  WCA
+  MANUAL
+}
+
+model Competition {
+  id                 String            @id @default(cuid())
+  wcaId              String            @unique @map("wca_id")
+  name               String
+  shortName          String?           @map("short_name")
+  startDate          DateTime          @map("start_date")
+  endDate            DateTime          @map("end_date")
+  status             CompetitionStatus @default(REQUESTED)
+  requestNotes       String?           @map("request_notes")
+  rejectionReason    String?           @map("rejection_reason")
+
+  // Proxy tunnel: URL is public-ish (the public hostname the instance is
+  // reachable at); the secret is the per-tunnel password and is encrypted at
+  // rest. Both are populated on approval (via the fkm-proxy create call).
+  proxyTunnelUrl     String?           @map("proxy_tunnel_url")
+  proxySecretEnc     String?           @map("proxy_secret_enc")
+
+  // Transient one-time-reveal payload for the latest generated API key:
+  // encrypted plaintext + expiry. Both fields are cleared the first time
+  // either the requester or an admin reveals the key.
+  pendingApiKeyEnc       String?  @map("pending_api_key_enc")
+  pendingApiKeyExpiresAt DateTime? @map("pending_api_key_expires_at")
+
+  requestedById      String            @map("requested_by_id")
+  requestedBy        User              @relation("RequestedBy", fields: [requestedById], references: [id])
+  approvedById       String?           @map("approved_by_id")
+  approvedBy         User?             @relation("ApprovedBy", fields: [approvedById], references: [id])
+
+  requestedAt        DateTime          @default(now()) @map("requested_at")
+  approvedAt         DateTime?         @map("approved_at")
+  rejectedAt         DateTime?         @map("rejected_at")
+
+  apiKeys            ApiKey[]
+  roles              CompetitionRole[]
+
+  @@index([status])
+  @@map("competitions")
+}
+
+model ApiKey {
+  id            String       @id @default(cuid())
+  competitionId String       @map("competition_id")
+  competition   Competition  @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  // SHA-256 hex of the plaintext key; plaintext is shown to the user once on
+  // creation and never stored.
+  keyHash       String       @unique @map("key_hash")
+  // Last 4 chars of the plaintext, kept so the admin UI can identify a key
+  // without revealing it.
+  lastFour      String       @map("last_four")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  expiresAt     DateTime     @map("expires_at")
+  revokedAt     DateTime?    @map("revoked_at")
+  lastUsedAt    DateTime?    @map("last_used_at")
+
+  @@index([competitionId])
+  @@map("api_keys")
+}
+
+model CompetitionRole {
+  id            String                 @id @default(cuid())
+  userId        String                 @map("user_id")
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competitionId String                 @map("competition_id")
+  competition   Competition            @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  role          CompetitionRoleKind
+  source        CompetitionRoleSource  @default(WCA)
+  createdAt     DateTime               @default(now()) @map("created_at")
+
+  @@unique([userId, competitionId, role])
+  @@index([competitionId])
+  @@map("competition_roles")
 }
  
 model VerificationToken {
