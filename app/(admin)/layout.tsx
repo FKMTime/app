@@ -1,4 +1,9 @@
-import { CommandIcon, HomeIcon, ListChecksIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  CommandIcon,
+  HomeIcon,
+  ListChecksIcon,
+} from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
 import { Header } from "@/components/protected/header";
 import { Main } from "@/components/protected/main";
@@ -41,5 +46,10 @@ const topNav = [
     icon: <CommandIcon size={16} />,
     title: "Competitions",
     href: "/admin/competitions",
+  },
+  {
+    icon: <ActivityIcon size={16} />,
+    title: "Sync health",
+    href: "/admin/health",
   },
 ];
