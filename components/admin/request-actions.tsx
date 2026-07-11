@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,7 +29,7 @@ export function RequestActions({ competitionId }: { competitionId: string }) {
 
   function handleReject() {
     if (!reason.trim()) {
-      window.alert("Reason is required");
+      window.alert("Please write a short reason — it's shown to the organizer.");
       return;
     }
     startTransition(async () => {
@@ -46,7 +47,7 @@ export function RequestActions({ competitionId }: { competitionId: string }) {
     return (
       <ApiKeyReveal
         plaintextKey={revealedKey}
-        note="This is the new API key for the competition. The organizer can also reveal it once from their dashboard."
+        note="This is the initial API key for the competition. The organizer can also reveal it once from their dashboard — after that it disappears from both places."
         onDismiss={() => setRevealedKey(null)}
       />
     );
@@ -58,9 +59,10 @@ export function RequestActions({ competitionId }: { competitionId: string }) {
         <Input
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Reason for rejection (shown to requester)"
+          placeholder="Why you're rejecting — the organizer will see this"
           disabled={pending}
           className="flex-1"
+          autoFocus
         />
         <div className="flex gap-2">
           <Button
@@ -89,7 +91,13 @@ export function RequestActions({ competitionId }: { competitionId: string }) {
 
   return (
     <div className="flex gap-2">
-      <Button size="sm" disabled={pending} onClick={handleApprove}>
+      <Button
+        size="sm"
+        disabled={pending}
+        onClick={handleApprove}
+        title="Provisions the proxy tunnel, mints the API key, and syncs WCA roles."
+      >
+        <Check className="h-3.5 w-3.5" aria-hidden />
         {pending ? "Approving…" : "Approve"}
       </Button>
       <Button
@@ -97,7 +105,9 @@ export function RequestActions({ competitionId }: { competitionId: string }) {
         variant="outline"
         disabled={pending}
         onClick={() => setRejecting(true)}
+        title="Closes the request with a reason shown to the organizer."
       >
+        <X className="h-3.5 w-3.5" aria-hidden />
         Reject
       </Button>
     </div>

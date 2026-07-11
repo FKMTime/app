@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { ActivityIcon, CircleAlert } from "lucide-react";
 import { prisma } from "@/prisma";
 import { CompetitionStatusBadge } from "@/components/dashboard/competition-status-badge";
+import { PageIntro } from "@/components/admin/page-intro";
+import { Card, CardContent } from "@/components/ui/card";
 
 // A comp is "stale" if it's APPROVED/LIVE and we haven't seen any traffic
 // (delta or heartbeat) in this many minutes. Configurable later; the design
@@ -42,18 +45,44 @@ export default async function AdminHealthPage() {
   const now = Date.now();
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">Sync health</h1>
-        <p className="text-sm text-muted-foreground">
-          Last delta / heartbeat per competition, instance version, and synced
-          entity counts. A red marker means no traffic for more than{" "}
-          {STALE_MINUTES} minutes (heartbeat is meant to be ~5 min).
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageIntro
+        Icon={ActivityIcon}
+        title="Sync health"
+        description="Are provisioned instances actively pushing data? A red dot means no delta or heartbeat has arrived in over 15 minutes (heartbeat is meant to be every ~5 min)."
+        secondary="FINISHED comps are shown but not flagged — they stop syncing on purpose."
+      />
+
+      <Card className="border-sky-200 bg-sky-50/60 dark:border-sky-900 dark:bg-sky-950/30">
+        <CardContent className="p-4 text-sm">
+          <div className="mb-1 font-medium">Column reference</div>
+          <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+            <li>
+              <strong className="text-foreground">Last delta</strong> — most
+              recent change-push (debounced, on-write).
+            </li>
+            <li>
+              <strong className="text-foreground">Last heartbeat</strong> —
+              most recent full-state snapshot (every ~5 min).
+            </li>
+            <li>
+              <strong className="text-foreground">Instance</strong> — instance
+              version string, useful when tracing bugs to a build.
+            </li>
+            <li>
+              <strong className="text-foreground">Rows</strong> — persons,
+              groups, assignments, results, attempts, incidents.
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
 
       {competitions.length === 0 ? (
-        <p className="text-muted-foreground">No provisioned competitions.</p>
+        <Card className="bg-muted/30">
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            No provisioned competitions to monitor yet.
+          </CardContent>
+        </Card>
       ) : (
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-sm">
@@ -61,10 +90,19 @@ export default async function AdminHealthPage() {
               <tr className="text-left">
                 <th className="px-3 py-2">Competition</th>
                 <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Last delta</th>
-                <th className="px-3 py-2">Last heartbeat</th>
+                <th className="px-3 py-2" title="Most recent /api/sync/delta write">
+                  Last delta
+                </th>
+                <th className="px-3 py-2" title="Most recent /api/sync/state (full-snapshot) write">
+                  Last heartbeat
+                </th>
                 <th className="px-3 py-2">Instance</th>
-                <th className="px-3 py-2">P / G / A / R / At / I</th>
+                <th
+                  className="px-3 py-2"
+                  title="Persons · Groups · Assignments · Results · Attempts · Incidents"
+                >
+                  Rows (P·G·A·R·At·I)
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -94,9 +132,12 @@ export default async function AdminHealthPage() {
                         <CompetitionStatusBadge status={c.status} />
                         {stale && (
                           <span
-                            className="inline-block h-2 w-2 rounded-full bg-red-500"
-                            title="No traffic in over 15 minutes"
-                          />
+                            className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700 dark:bg-red-950 dark:text-red-200"
+                            title={`No traffic in over ${STALE_MINUTES} minutes`}
+                          >
+                            <CircleAlert className="h-3 w-3" aria-hidden />
+                            stale
+                          </span>
                         )}
                       </div>
                     </td>
@@ -110,9 +151,9 @@ export default async function AdminHealthPage() {
                       {c.syncStatus?.instanceVersion ?? "—"}
                     </td>
                     <td className="px-3 py-2 font-mono text-xs">
-                      {c._count.persons}/{c._count.groups}/
-                      {c._count.assignments}/{c._count.results}/
-                      {c._count.attempts}/{c._count.incidents}
+                      {c._count.persons}·{c._count.groups}·
+                      {c._count.assignments}·{c._count.results}·
+                      {c._count.attempts}·{c._count.incidents}
                     </td>
                   </tr>
                 );

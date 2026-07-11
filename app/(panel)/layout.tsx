@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { ModeToggle } from "@/components/mode-toggle";
+import { AdminModePill } from "@/components/protected/admin-mode-pill";
 import { Header } from "@/components/protected/header";
 import { Main } from "@/components/protected/main";
 import { ProfileDropdown } from "@/components/protected/profile-dropdown";
@@ -17,7 +18,8 @@ export default async function PanelOuterLayout({
     <>
       <Header>
         <div className="text-sm font-medium">FKMTime · Panel</div>
-        <div className="ml-auto flex items-center space-x-4">
+        <div className="ml-auto flex items-center gap-3">
+          {session.user.isAdmin && <AdminModePill />}
           <ModeToggle />
           <ProfileDropdown />
         </div>

@@ -54,6 +54,8 @@ model User {
   competitionRoles      CompetitionRole[]
   editedAttempts        Attempt[]          @relation("AttemptEditedBy")
   createdIncidents      Incident[]         @relation("IncidentCreatedBy")
+  pushSubscriptions     PushSubscription[]
+  notificationLogs      NotificationLog[]
 
   @@map("users")
 }
@@ -117,6 +119,9 @@ model Competition {
   attempts           Attempt[]
   incidents          Incident[]
   syncStatus         SyncStatus?
+  pushOptIns         PushCompetitionOptIn[]
+  notificationLogs   NotificationLog[]
+  dumps              DbDump[]
 
   @@index([status])
   @@map("competitions")
@@ -244,7 +249,8 @@ model Group {
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
-  assignments     Assignment[]
+  assignments      Assignment[]
+  notificationLogs NotificationLog[]
 
   @@unique([competitionId, instanceId])
   @@index([competitionId, activityCode])
@@ -354,6 +360,82 @@ model SyncStatus {
   lastClientSentAt DateTime?   @map("last_client_sent_at")
 
   @@map("sync_status")
+}
+
+// =====================================================================
+// Phase 5 — Web Push notifications.
+//
+// A subscription is tied to a User; per-competition opt-in is expressed
+// via the join table PushCompetitionOptIn. A user can subscribe on
+// multiple devices — each device (endpoint) is one row.
+// =====================================================================
+
+model PushSubscription {
+  id            String                  @id @default(cuid())
+  userId        String                  @map("user_id")
+  user          User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint      String                  @unique
+  p256dh        String
+  authKey       String                  @map("auth_key")
+  userAgent     String?                 @map("user_agent")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  lastUsedAt    DateTime?               @map("last_used_at")
+
+  competitions  PushCompetitionOptIn[]
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model PushCompetitionOptIn {
+  subscriptionId String            @map("subscription_id")
+  subscription   PushSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  competitionId  String            @map("competition_id")
+  competition    Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  createdAt      DateTime          @default(now()) @map("created_at")
+
+  @@id([subscriptionId, competitionId])
+  @@index([competitionId])
+  @@map("push_competition_optins")
+}
+
+enum NotificationKind {
+  GROUP_ONGOING
+}
+
+// Dedupe log: unique (groupId, userId, kind). A heartbeat re-asserting an
+// already-notified group status can never send a duplicate push.
+model NotificationLog {
+  id            String            @id @default(cuid())
+  userId        String            @map("user_id")
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competitionId String            @map("competition_id")
+  competition   Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  groupId       String            @map("group_id")
+  group         Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  kind          NotificationKind
+  sentAt        DateTime          @default(now()) @map("sent_at")
+
+  @@unique([groupId, userId, kind])
+  @@index([competitionId])
+  @@map("notification_logs")
+}
+
+// =====================================================================
+// Phase 6 — End-of-competition dumps.
+// =====================================================================
+
+model DbDump {
+  id            String       @id @default(cuid())
+  competitionId String       @map("competition_id")
+  competition   Competition  @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  // R2 object key (e.g. "dumps/<wcaId>/<uploadedAt>.sql.gz").
+  objectKey     String       @map("object_key")
+  sizeBytes     BigInt       @map("size_bytes")
+  uploadedAt    DateTime     @default(now()) @map("uploaded_at")
+
+  @@index([competitionId])
+  @@map("db_dumps")
 }
  
 model VerificationToken {

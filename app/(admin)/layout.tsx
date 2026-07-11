@@ -5,6 +5,7 @@ import {
   ListChecksIcon,
 } from "lucide-react";
 import { ModeToggle } from "@/components/mode-toggle";
+import { AdminModePill } from "@/components/protected/admin-mode-pill";
 import { Header } from "@/components/protected/header";
 import { Main } from "@/components/protected/main";
 import { ProfileDropdown } from "@/components/protected/profile-dropdown";
@@ -18,16 +19,17 @@ export default async function AdminLayout({
 }) {
   await requireAdmin();
   return (
-    <>
+    <div className="min-h-svh border-t-4 border-rose-500 dark:border-rose-600">
       <Header>
         <TopNav links={topNav} />
-        <div className="ml-auto flex items-center space-x-4">
+        <div className="ml-auto flex items-center gap-3">
+          <AdminModePill variant="strong" />
           <ModeToggle />
           <ProfileDropdown />
         </div>
       </Header>
       <Main>{children}</Main>
-    </>
+    </div>
   );
 }
 

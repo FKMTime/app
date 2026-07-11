@@ -15,6 +15,7 @@ import {
   type StatePayload,
 } from "./contract";
 import { syncEventBus } from "./events";
+import { notifyGroupsOngoing } from "@/lib/notifier/groupChanges";
 
 type Tx = Prisma.TransactionClient;
 
@@ -100,18 +101,37 @@ async function upsertGroups(
   tx: Tx,
   competitionId: string,
   rows: GroupPayload[],
-): Promise<{ idByInstanceId: Map<string, string>; writes: number }> {
+): Promise<{
+  idByInstanceId: Map<string, string>;
+  writes: number;
+  becameOngoing: string[];
+}> {
   const idByInstanceId = new Map<string, string>();
+  const becameOngoing: string[] = [];
   let writes = 0;
-  if (rows.length === 0) return { idByInstanceId, writes };
+  if (rows.length === 0) return { idByInstanceId, writes, becameOngoing };
 
   const instanceIds = rows.map((r) => r.instanceId);
-  const existing = intoMap(
-    await tx.group.findMany({
-      where: { competitionId, instanceId: { in: instanceIds } },
-      select: { id: true, instanceId: true, sourceUpdatedAt: true },
-    }),
-  );
+  const existingRows = await tx.group.findMany({
+    where: { competitionId, instanceId: { in: instanceIds } },
+    select: {
+      id: true,
+      instanceId: true,
+      sourceUpdatedAt: true,
+      status: true,
+    },
+  });
+  const existing = new Map<
+    string,
+    { id: string; sourceUpdatedAt: Date; status: string }
+  >();
+  for (const r of existingRows) {
+    existing.set(r.instanceId, {
+      id: r.id,
+      sourceUpdatedAt: r.sourceUpdatedAt,
+      status: r.status,
+    });
+  }
 
   for (const r of rows) {
     const prior = existing.get(r.instanceId);
@@ -136,8 +156,14 @@ async function upsertGroups(
     });
     idByInstanceId.set(r.instanceId, row.id);
     writes++;
+
+    // Notify on the transition INTO ONGOING; other transitions are silent.
+    // First-seen groups whose payload arrives already-ONGOING also qualify.
+    if (r.status === "ONGOING" && (!prior || prior.status !== "ONGOING")) {
+      becameOngoing.push(row.id);
+    }
   }
-  return { idByInstanceId, writes };
+  return { idByInstanceId, writes, becameOngoing };
 }
 
 function rowsToIdMap(
@@ -352,10 +378,12 @@ async function applyCommon(
   mode: "delta" | "state",
 ): Promise<ReconcileResult> {
   const counts = emptyCounts();
+  let becameOngoing: string[] = [];
   const result = await prisma.$transaction(async (tx: Tx) => {
     // Parent entities first.
     const personRes = await upsertPersons(tx, competitionId, payload.persons);
     const groupRes = await upsertGroups(tx, competitionId, payload.groups);
+    becameOngoing = groupRes.becameOngoing;
 
     // Inner-tier entities can reference parents that didn't ship in this
     // batch but already exist in the DB — pull a complete map only if we
@@ -503,6 +531,15 @@ async function applyCommon(
       scopes: changedScopes,
       at: new Date(),
     });
+  }
+
+  // Fire-and-forget group-status notifications AFTER the tx commits.
+  // Notifier catches its own errors; a slow push endpoint must never
+  // delay an instance's sync request.
+  if (becameOngoing.length > 0) {
+    notifyGroupsOngoing(competitionId, becameOngoing).catch((e) =>
+      console.error("[reconcile] notifyGroupsOngoing failed:", e),
+    );
   }
 
   return { changedScopes, counts: result };

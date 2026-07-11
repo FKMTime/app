@@ -115,6 +115,77 @@ export async function getRoundsForCompetition(competitionId: string) {
   });
 }
 
+// The distinct set of events with any Result — used for chips on the hub page.
+export async function getEventIdsForCompetition(competitionId: string) {
+  const rows = await prisma.result.findMany({
+    where: { competitionId },
+    distinct: ["eventId"],
+    orderBy: { eventId: "asc" },
+    select: { eventId: true },
+  });
+  return rows.map((r) => r.eventId);
+}
+
+export async function getCompetitorCount(competitionId: string) {
+  return prisma.person.count({ where: { competitionId } });
+}
+
+// Full competitor list for the /competitors index — public-safe fields only.
+export async function getCompetitorList(competitionId: string) {
+  return prisma.person.findMany({
+    where: { competitionId },
+    orderBy: [{ name: "asc" }],
+    select: {
+      id: true,
+      registrantId: true,
+      name: true,
+      wcaId: true,
+      countryIso2: true,
+    },
+  });
+}
+
+// Organizers + delegates for a public competition page. Sourced from the
+// CompetitionRole table (WCIF sync); each row is a User already in our DB.
+// We surface name, WCA ID, and role kind — nothing sensitive.
+export async function getPublicCompetitionRoles(competitionId: string) {
+  return prisma.competitionRole.findMany({
+    where: { competitionId },
+    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      role: true,
+      source: true,
+      user: {
+        select: {
+          name: true,
+          wcaId: true,
+          image: true,
+        },
+      },
+    },
+  });
+}
+
+// Public index of competitions (LIVE first, then APPROVED, then FINISHED).
+export async function getPublicCompetitionsIndex() {
+  return prisma.competition.findMany({
+    where: {
+      status: { in: ["LIVE", "APPROVED", "FINISHED"] },
+    },
+    orderBy: [{ status: "asc" }, { startDate: "asc" }],
+    select: {
+      id: true,
+      wcaId: true,
+      name: true,
+      shortName: true,
+      startDate: true,
+      endDate: true,
+      status: true,
+    },
+  });
+}
+
 export async function getCompetitorByRegistrantId(
   competitionId: string,
   registrantId: number,
